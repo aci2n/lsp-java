@@ -108,6 +108,20 @@ If the port is taken, DAP will try the next port."
   (lsp-interface
    (java:MainClass (:mainClass :projectName))))
 
+(defun dap-java--fully-qualified-class-name (package-name class-name)
+  "Compute a fully qualified class name as specified in
+https://docs.oracle.com/javase/specs/jls/se11/html/jls-6.html#jls-6.7:
+
+- The fully qualified name of a top level class or top level interface
+that is declared in an unnamed package is the simple name of the class or interface.
+
+- The fully qualified name of a top level class or top level interface
+that is declared in a named package consists of the fully qualified name of the package,
+followed by \".\", followed by the simple name of the class or interface."
+  (if (and (stringp package-name) (not (string-empty-p package-name)))
+      (concat package-name "." class-name)
+    class-name))
+
 (defun dap-java-test-class (&optional no-signal?)
   "Get class FDQN."
   (-if-let* ((symbols (lsp--get-document-symbols))
@@ -117,7 +131,7 @@ If the port is taken, DAP will try the next port."
              (class-name (->> symbols
                               (--first (= (lsp:document-symbol-kind it) lsp/symbol-kind-class))
                               lsp:document-symbol-name)))
-      (concat package-name "." class-name)
+      (dap-java--fully-qualified-class-name package-name class-name)
     (unless no-signal?
         (user-error "No class found"))))
 
@@ -134,7 +148,7 @@ If the port is taken, DAP will try the next port."
                             (-lambda ((&DocumentSymbol :kind :range :selection-range))
                               (-let (((beg . end) (lsp--range-to-region range)))
                                 (and (= lsp/symbol-kind-method kind) (<= beg (point) end)
-                                     (concat package-name "." class-name "#"
+                                     (concat (dap-java--fully-qualified-class-name package-name class-name) "#"
                                              (lsp-region-text selection-range)))))
                             children?))))
              (cl-first))
